@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.gemini_api import generate_image, test_api_connection
+from scripts.bedrock_api import generate_image, test_api_connection
 from scripts.stitch_images import stitch_from_directory, create_preview
 
 
@@ -428,7 +428,7 @@ def generate_landing_page(
         # API 연결 테스트
         print("\nTesting API connection...")
         if not test_api_connection():
-            print("API connection failed. Check your GEMINI_API_KEY.")
+            print("API connection failed. Check your AWS credentials.")
             return None
 
         # 섹션별 이미지 생성
