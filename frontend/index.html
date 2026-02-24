@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 상세페이지 생성기</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'Pretendard', sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+
+    .header { background: linear-gradient(135deg, #1e40af, #7c3aed); color: #fff; padding: 2rem; text-align: center; }
+    .header h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .header p { opacity: 0.85; font-size: 0.95rem; }
+
+    .container { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
+
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.35rem; }
+    .field input, .field textarea, .field select {
+      width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px;
+      font-size: 0.9rem; transition: border-color 0.2s;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    .field textarea { resize: vertical; min-height: 60px; }
+    .field .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      width: 100%; padding: 0.85rem; border: none; border-radius: 10px; cursor: pointer;
+      font-size: 1rem; font-weight: 600; transition: all 0.2s;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-section { background: #f1f5f9; color: #334155; font-size: 0.85rem; padding: 0.6rem; }
+    .btn-section:hover { background: #e2e8f0; }
+
+    .progress { display: none; margin: 1.5rem 0; }
+    .progress.show { display: block; }
+    .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #7c3aed); border-radius: 3px; transition: width 0.5s; width: 0%; }
+    .progress-text { text-align: center; margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .result { display: none; }
+    .result.show { display: block; }
+    .result img { width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .result-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
+    .result-actions a {
+      flex: 1; text-align: center; padding: 0.7rem; border-radius: 8px;
+      text-decoration: none; font-weight: 600; font-size: 0.9rem;
+    }
+    .result-actions .dl-png { background: #2563eb; color: #fff; }
+    .result-actions .dl-new { background: #f1f5f9; color: #334155; }
+
+    .sections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+    .section-thumb { border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; }
+    .section-thumb:hover { transform: scale(1.02); }
+    .section-thumb img { width: 100%; display: block; }
+    .section-thumb .label { padding: 0.4rem; font-size: 0.75rem; text-align: center; background: #f8fafc; color: #64748b; }
+
+    .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem; border-radius: 8px; display: none; }
+    .error.show { display: block; }
+
+    .preset-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .chip {
+      padding: 0.4rem 0.75rem; border-radius: 20px; border: 1px solid #cbd5e1;
+      font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
+    }
+    .chip.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+    @media (max-width: 640px) { .row, .row-3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AI Landing Page Generator</h1>
+    <p>AWS Bedrock (Opus 4.6 + Nova Canvas) - 13 Section Auto Generation</p>
+  </div>
+
+  <div class="container">
+    <!-- Input Form -->
+    <form id="form">
+      <div class="card">
+        <h2>1. Product Info (Required)</h2>
+        <div class="field">
+          <label>Product Name</label>
+          <input type="text" id="product_name" value="AI Marketing Automation" required>
+        </div>
+        <div class="field">
+          <label>One Liner</label>
+          <input type="text" id="one_liner" value="AI-based marketing optimization that cuts ad costs by 50%" required>
+        </div>
+        <div class="field">
+          <label>Target Audience</label>
+          <input type="text" id="target_audience" value="Smart store sellers spending over 1M KRW/month on ads" required>
+        </div>
+        <div class="field">
+          <label>Main Problem</label>
+          <textarea id="main_problem" required>Spending 2 hours daily optimizing ads while ROAS stays flat</textarea>
+        </div>
+        <div class="field">
+          <label>Key Benefit</label>
+          <textarea id="key_benefit" required>AI optimizes ads 24/7, cutting ad spend by 50% on average</textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2. Pricing & Urgency</h2>
+        <div class="row-3">
+          <div class="field">
+            <label>Original Price</label>
+            <input type="text" id="price_original" value="199,000">
+          </div>
+          <div class="field">
+            <label>Discounted Price</label>
+            <input type="text" id="price_discounted" value="99,000">
+          </div>
+          <div class="field">
+            <label>Period</label>
+            <input type="text" id="price_period" value="month">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Urgency</label>
+            <input type="text" id="urgency_value" value="First 100 customers only">
+          </div>
+          <div class="field">
+            <label>Bonus</label>
+            <input type="text" id="urgency_bonus" value="Free 1:1 setup consultation">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>3. Design Style</h2>
+        <div class="field">
+          <label>Style Preset</label>
+          <div class="preset-chips">
+            <span class="chip active" data-value="minimal">Minimal</span>
+            <span class="chip" data-value="sales">Sales</span>
+            <span class="chip" data-value="premium">Premium</span>
+            <span class="chip" data-value="community">Community</span>
+          </div>
+        </div>
+        <div class="row-3">
+          <div class="field">
+            <label>Primary Color</label>
+            <input type="color" id="color_primary" value="#2563EB">
+          </div>
+          <div class="field">
+            <label>Secondary Color</label>
+            <input type="color" id="color_secondary" value="#60A5FA">
+          </div>
+          <div class="field">
+            <label>Accent Color</label>
+            <input type="color" id="color_accent" value="#F59E0B">
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submitBtn">
+        Generate Landing Page (13 Sections)
+      </button>
+    </form>
+
+    <!-- Progress -->
+    <div class="progress" id="progress">
+      <div class="card">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <p class="progress-text" id="progressText">Generating...</p>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="error" id="error"></div>
+
+    <!-- Result -->
+    <div class="result" id="result">
+      <div class="card">
+        <h2>Result</h2>
+        <img id="resultImg" src="" alt="Generated landing page">
+        <div class="result-actions">
+          <a href="#" class="dl-png" id="downloadBtn" download="landing_page.png">Download PNG</a>
+          <a href="#" class="dl-new" id="resetBtn">Generate New</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'https://sgtlim0--landing-page-generator-generate.modal.run';
+    const API_SECTION = 'https://sgtlim0--landing-page-generator-generate-section.modal.run';
+
+    // Style preset chips
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
+
+    // Build brief from form
+    function buildBrief() {
+      return {
+        product_name: document.getElementById('product_name').value,
+        one_liner: document.getElementById('one_liner').value,
+        target_audience: document.getElementById('target_audience').value,
+        main_problem: document.getElementById('main_problem').value,
+        key_benefit: document.getElementById('key_benefit').value,
+        price: {
+          original: document.getElementById('price_original').value,
+          discounted: document.getElementById('price_discounted').value,
+          period: document.getElementById('price_period').value,
+        },
+        urgency: {
+          type: 'quantity',
+          value: document.getElementById('urgency_value').value,
+          bonus: document.getElementById('urgency_bonus').value,
+        },
+        style_preset: document.querySelector('.chip.active')?.dataset.value || 'minimal',
+        brand_colors: {
+          primary: document.getElementById('color_primary').value,
+          secondary: document.getElementById('color_secondary').value,
+          accent: document.getElementById('color_accent').value,
+        },
+      };
+    }
+
+    // Form submit
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const btn = document.getElementById('submitBtn');
+      const progress = document.getElementById('progress');
+      const error = document.getElementById('error');
+      const result = document.getElementById('result');
+
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      progress.classList.add('show');
+      error.classList.remove('show');
+      result.classList.remove('show');
+
+      // Simulate progress (actual API takes ~3-5 min)
+      let pct = 0;
+      const progressInterval = setInterval(() => {
+        pct = Math.min(pct + (Math.random() * 3 + 1), 95);
+        document.getElementById('progressFill').style.width = pct + '%';
+        const section = Math.min(Math.ceil(pct / 7.7), 13);
+        document.getElementById('progressText').textContent =
+          `Generating section ${section}/13... (${Math.round(pct)}%)`;
+      }, 3000);
+
+      try {
+        const brief = buildBrief();
+        const resp = await fetch(API_BASE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(brief),
+        });
+
+        clearInterval(progressInterval);
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`API Error ${resp.status}: ${text}`);
+        }
+
+        const contentType = resp.headers.get('content-type');
+
+        if (contentType && contentType.includes('image/png')) {
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+
+          document.getElementById('progressFill').style.width = '100%';
+          document.getElementById('progressText').textContent = 'Complete!';
+
+          setTimeout(() => {
+            progress.classList.remove('show');
+            result.classList.add('show');
+            document.getElementById('resultImg').src = url;
+            document.getElementById('downloadBtn').href = url;
+          }, 500);
+        } else {
+          const data = await resp.json();
+          throw new Error(data.error || 'Unknown error');
+        }
+      } catch (err) {
+        clearInterval(progressInterval);
+        progress.classList.remove('show');
+        error.classList.add('show');
+        error.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Landing Page (13 Sections)';
+      }
+    });
+
+    // Reset
+    document.getElementById('resetBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('result').classList.remove('show');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>
