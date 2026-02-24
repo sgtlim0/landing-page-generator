@@ -43,15 +43,28 @@ SECTION_HEIGHTS = {
 # ──────────────────────────────────────────────
 # Bedrock 헬퍼
 # ──────────────────────────────────────────────
-def _get_bedrock_client():
+def _get_bedrock_client(credentials: Optional[dict] = None):
+    """
+    Bedrock Runtime 클라이언트를 생성합니다.
+    credentials가 제공되면 해당 키를 사용하고,
+    없으면 환경변수(Modal Secret)에서 가져옵니다.
+    """
     import boto3
     from botocore.config import Config
 
+    creds = credentials or {}
+    access_key = creds.get("aws_access_key_id") or os.environ.get("AWS_ACCESS_KEY_ID", "")
+    secret_key = creds.get("aws_secret_access_key") or os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+    region = creds.get("aws_region") or os.environ.get("AWS_REGION", "us-east-1")
+
+    if not access_key or not secret_key:
+        raise ValueError("AWS credentials are required. Provide aws_access_key_id and aws_secret_access_key.")
+
     return boto3.client(
         "bedrock-runtime",
-        region_name=os.environ.get("AWS_REGION", "us-east-1"),
-        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+        region_name=region,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
         config=Config(retries={"max_attempts": 3, "mode": "adaptive"}, read_timeout=300),
     )
 
@@ -267,9 +280,13 @@ SAMPLE_BRIEF = {
     secrets=[modal.Secret.from_name("aws-bedrock-secrets")],
     timeout=900,  # 15분
 )
-def generate_landing_page(brief: Optional[dict] = None) -> dict:
+def generate_landing_page(brief: Optional[dict] = None, credentials: Optional[dict] = None) -> dict:
     """
     전체 상세페이지를 생성하고 결과를 반환합니다.
+
+    Args:
+        brief: 제품 정보
+        credentials: AWS 자격증명 (없으면 환경변수 사용)
 
     Returns:
         {
@@ -281,7 +298,7 @@ def generate_landing_page(brief: Optional[dict] = None) -> dict:
     if brief is None:
         brief = SAMPLE_BRIEF
 
-    client = _get_bedrock_client()
+    client = _get_bedrock_client(credentials)
     prompts = _build_prompts(brief)
 
     sections = {}
@@ -324,11 +341,28 @@ def generate_landing_page(brief: Optional[dict] = None) -> dict:
     timeout=900,
 )
 @modal.fastapi_endpoint(method="POST", docs=True)
-def generate(brief: Optional[dict] = None):
-    """POST /generate - 상세페이지 생성 API"""
+def generate(payload: Optional[dict] = None):
+    """POST /generate - 상세페이지 생성 API
+
+    Body format:
+    {
+        "aws_credentials": {"aws_access_key_id": "...", "aws_secret_access_key": "...", "aws_region": "..."},
+        "brief": { ...product info... }
+    }
+    Or legacy format (brief only): { "product_name": "...", ... }
+    """
     from fastapi.responses import Response
 
-    result = generate_landing_page.local(brief)
+    credentials = None
+    brief = None
+
+    if payload and "aws_credentials" in payload:
+        credentials = payload.get("aws_credentials")
+        brief = payload.get("brief")
+    else:
+        brief = payload
+
+    result = generate_landing_page.local(brief, credentials)
 
     if result["final_page"]:
         return Response(
@@ -348,9 +382,20 @@ def generate(brief: Optional[dict] = None):
     timeout=900,
 )
 @modal.fastapi_endpoint(method="POST", docs=True)
-def generate_section(section_key: str = "01_hero", brief: Optional[dict] = None):
+def generate_section(payload: Optional[dict] = None):
     """POST /generate_section - 개별 섹션 이미지 생성"""
     from fastapi.responses import Response
+
+    credentials = None
+    brief = None
+    section_key = "01_hero"
+
+    if payload and "aws_credentials" in payload:
+        credentials = payload.get("aws_credentials")
+        brief = payload.get("brief")
+        section_key = payload.get("section_key", "01_hero")
+    else:
+        brief = payload
 
     if brief is None:
         brief = SAMPLE_BRIEF
@@ -359,7 +404,7 @@ def generate_section(section_key: str = "01_hero", brief: Optional[dict] = None)
     if section_key not in prompts:
         return {"error": f"Unknown section: {section_key}", "available": list(prompts.keys())}
 
-    client = _get_bedrock_client()
+    client = _get_bedrock_client(credentials)
     data = prompts[section_key]
     png_bytes = _generate_one_image(client, data["prompt"], data["width"], data["height"])
 
@@ -371,8 +416,8 @@ def generate_section(section_key: str = "01_hero", brief: Optional[dict] = None)
 @app.function(image=image, secrets=[modal.Secret.from_name("aws-bedrock-secrets")])
 @modal.fastapi_endpoint(method="GET", docs=True)
 def health():
-    """GET /health - API 상태 확인"""
-    client = _get_bedrock_client()
+    """GET /health - API 상태 확인 (환경변수 자격증명 사용)"""
+    client = _get_bedrock_client(None)
     text_model = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-opus-4-6-v1")
 
     try:

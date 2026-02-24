@@ -87,6 +87,31 @@
     <!-- Input Form -->
     <form id="form">
       <div class="card">
+        <h2>0. AWS Credentials (Required)</h2>
+        <p style="font-size:0.8rem;color:#64748b;margin-bottom:1rem;">AWS Bedrock API access keys. Get from <a href="https://console.aws.amazon.com/iam/" target="_blank" style="color:#2563eb;">AWS IAM Console</a></p>
+        <div class="row">
+          <div class="field">
+            <label>AWS Access Key ID</label>
+            <input type="text" id="aws_access_key" placeholder="AKIA..." required autocomplete="off">
+          </div>
+          <div class="field">
+            <label>AWS Secret Access Key</label>
+            <input type="password" id="aws_secret_key" placeholder="your secret key" required autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label>AWS Region</label>
+          <select id="aws_region">
+            <option value="us-east-1" selected>us-east-1 (N. Virginia)</option>
+            <option value="us-west-2">us-west-2 (Oregon)</option>
+            <option value="eu-west-1">eu-west-1 (Ireland)</option>
+            <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+          </select>
+          <div class="hint">Credentials are sent directly to the server and NOT stored anywhere.</div>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>1. Product Info (Required)</h2>
         <div class="field">
           <label>Product Name</label>
@@ -206,29 +231,36 @@
       });
     });
 
-    // Build brief from form
-    function buildBrief() {
+    // Build request payload from form
+    function buildPayload() {
       return {
-        product_name: document.getElementById('product_name').value,
-        one_liner: document.getElementById('one_liner').value,
-        target_audience: document.getElementById('target_audience').value,
-        main_problem: document.getElementById('main_problem').value,
-        key_benefit: document.getElementById('key_benefit').value,
-        price: {
-          original: document.getElementById('price_original').value,
-          discounted: document.getElementById('price_discounted').value,
-          period: document.getElementById('price_period').value,
+        aws_credentials: {
+          aws_access_key_id: document.getElementById('aws_access_key').value.trim(),
+          aws_secret_access_key: document.getElementById('aws_secret_key').value.trim(),
+          aws_region: document.getElementById('aws_region').value,
         },
-        urgency: {
-          type: 'quantity',
-          value: document.getElementById('urgency_value').value,
-          bonus: document.getElementById('urgency_bonus').value,
-        },
-        style_preset: document.querySelector('.chip.active')?.dataset.value || 'minimal',
-        brand_colors: {
-          primary: document.getElementById('color_primary').value,
-          secondary: document.getElementById('color_secondary').value,
-          accent: document.getElementById('color_accent').value,
+        brief: {
+          product_name: document.getElementById('product_name').value,
+          one_liner: document.getElementById('one_liner').value,
+          target_audience: document.getElementById('target_audience').value,
+          main_problem: document.getElementById('main_problem').value,
+          key_benefit: document.getElementById('key_benefit').value,
+          price: {
+            original: document.getElementById('price_original').value,
+            discounted: document.getElementById('price_discounted').value,
+            period: document.getElementById('price_period').value,
+          },
+          urgency: {
+            type: 'quantity',
+            value: document.getElementById('urgency_value').value,
+            bonus: document.getElementById('urgency_bonus').value,
+          },
+          style_preset: document.querySelector('.chip.active')?.dataset.value || 'minimal',
+          brand_colors: {
+            primary: document.getElementById('color_primary').value,
+            secondary: document.getElementById('color_secondary').value,
+            accent: document.getElementById('color_accent').value,
+          },
         },
       };
     }
@@ -259,11 +291,11 @@
       }, 3000);
 
       try {
-        const brief = buildBrief();
+        const payload = buildPayload();
         const resp = await fetch(API_BASE, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(brief),
+          body: JSON.stringify(payload),
         });
 
         clearInterval(progressInterval);
