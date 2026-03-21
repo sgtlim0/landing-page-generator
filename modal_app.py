@@ -78,7 +78,7 @@ def _compress_prompt(client, prompt: str) -> str:
     if len(prompt) <= NOVA_CANVAS_MAX_CHARS:
         return prompt
 
-    model_id = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-opus-4-6-v1")
+    model_id = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-sonnet-4-6-v1")
     body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 1024,
@@ -337,7 +337,7 @@ def generate_landing_page(brief: Optional[dict] = None, credentials: Optional[di
 # ──────────────────────────────────────────────
 def _call_opus(client, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
     """Opus 4.6으로 텍스트를 생성합니다."""
-    model_id = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-opus-4-6-v1")
+    model_id = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-sonnet-4-6-v1")
     body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
@@ -641,7 +641,7 @@ def generate_copy(payload: Optional[dict] = None):
 def health():
     """GET /health - API 상태 확인 (환경변수 자격증명 사용)"""
     client = _get_bedrock_client(None)
-    text_model = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-opus-4-6-v1")
+    text_model = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-sonnet-4-6-v1")
 
     try:
         resp = client.invoke_model(
