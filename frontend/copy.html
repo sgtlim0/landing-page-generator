@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Copywriter Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'Pretendard', sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+
+    .header { background: linear-gradient(135deg, #059669, #0d9488); color: #fff; padding: 2rem; text-align: center; }
+    .header h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .header p { opacity: 0.85; font-size: 0.95rem; }
+
+    .container { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
+
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.35rem; }
+    .field input, .field textarea, .field select {
+      width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px;
+      font-size: 0.9rem; transition: border-color 0.2s;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,0.1); }
+    .field textarea { resize: vertical; min-height: 60px; }
+    .field .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      width: 100%; padding: 0.85rem; border: none; border-radius: 10px; cursor: pointer;
+      font-size: 1rem; font-weight: 600; transition: all 0.2s;
+    }
+    .btn-primary { background: #059669; color: #fff; }
+    .btn-primary:hover { background: #047857; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .progress { display: none; margin: 1.5rem 0; }
+    .progress.show { display: block; }
+    .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #059669, #0d9488); border-radius: 3px; transition: width 0.5s; width: 0%; }
+    .progress-text { text-align: center; margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem; border-radius: 8px; display: none; margin-bottom: 1rem; }
+    .error.show { display: block; }
+
+    .result { display: none; }
+    .result.show { display: block; }
+
+    .nav-link { display: inline-block; margin-top: 0.5rem; color: #059669; font-size: 0.85rem; text-decoration: none; }
+    .nav-link:hover { text-decoration: underline; }
+
+    /* Copy Output Styles */
+    .section-output { margin-bottom: 1.5rem; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+    .section-header {
+      background: #f1f5f9; padding: 0.75rem 1rem; cursor: pointer; display: flex;
+      align-items: center; justify-content: space-between; user-select: none;
+    }
+    .section-header:hover { background: #e2e8f0; }
+    .section-header h3 { font-size: 0.95rem; color: #334155; }
+    .section-header .badge { font-size: 0.7rem; background: #059669; color: #fff; padding: 0.2rem 0.5rem; border-radius: 10px; }
+    .section-body { padding: 1rem; display: none; }
+    .section-body.open { display: block; }
+
+    .copy-field { margin-bottom: 0.75rem; }
+    .copy-field .label { font-size: 0.75rem; font-weight: 600; color: #059669; text-transform: uppercase; margin-bottom: 0.25rem; }
+    .copy-field .value { font-size: 0.9rem; color: #1e293b; line-height: 1.6; white-space: pre-wrap; }
+    .copy-field .value-list { list-style: none; padding: 0; }
+    .copy-field .value-list li { padding: 0.3rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+    .copy-field .value-list li:last-child { border-bottom: none; }
+
+    .headline-option {
+      background: #f8fafc; padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.4rem;
+      border-left: 3px solid #059669; font-size: 0.9rem; font-weight: 500;
+    }
+
+    .testimonial-card {
+      background: #f8fafc; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem;
+    }
+    .testimonial-card .quote { font-style: italic; color: #475569; margin-bottom: 0.3rem; }
+    .testimonial-card .meta { font-size: 0.8rem; color: #94a3b8; }
+
+    .step-card {
+      display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%; background: #059669; color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+      font-weight: 700; flex-shrink: 0;
+    }
+
+    .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .comparison-col h4 { font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .comparison-col.without h4 { color: #dc2626; }
+    .comparison-col.with h4 { color: #059669; }
+    .comparison-col li { font-size: 0.85rem; margin-bottom: 0.3rem; }
+
+    .copy-all-btn {
+      background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; padding: 0.5rem 1rem;
+      border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    }
+    .copy-all-btn:hover { background: #e2e8f0; }
+
+    .tab-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tab {
+      padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0;
+      cursor: pointer; font-size: 0.85rem; font-weight: 600; background: #fff;
+    }
+    .tab.active { background: #059669; color: #fff; border-color: #059669; }
+
+    @media (max-width: 640px) { .row, .row-3, .comparison-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AI Copywriter Generator</h1>
+    <p>AWS Bedrock (Opus 4.6) - 13 Section Sales Copy Auto Generation</p>
+    <a href="index.html" class="nav-link" style="color:#fff;opacity:0.8;">Landing Page Image Generator</a>
+  </div>
+
+  <div class="container">
+    <form id="form">
+      <!-- AWS Credentials -->
+      <div class="card">
+        <h2>0. AWS Credentials (Required)</h2>
+        <p style="font-size:0.8rem;color:#64748b;margin-bottom:1rem;">AWS Bedrock API access keys. Get from <a href="https://console.aws.amazon.com/iam/" target="_blank" style="color:#059669;">AWS IAM Console</a></p>
+        <div class="row">
+          <div class="field">
+            <label>AWS Access Key ID</label>
+            <input type="password" id="aws_access_key" placeholder="AKIA..." required autocomplete="off">
+          </div>
+          <div class="field">
+            <label>AWS Secret Access Key</label>
+            <input type="password" id="aws_secret_key" placeholder="your secret key" required autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label>AWS Region</label>
+          <select id="aws_region">
+            <option value="us-east-1" selected>us-east-1 (N. Virginia)</option>
+            <option value="us-west-2">us-west-2 (Oregon)</option>
+            <option value="eu-west-1">eu-west-1 (Ireland)</option>
+            <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+          </select>
+          <div class="hint">Credentials are sent via HTTPS directly to the server and NOT stored. For production use, configure credentials as environment variables on the server instead.</div>
+        </div>
+      </div>
+
+      <!-- Product Info -->
+      <div class="card">
+        <h2>1. Product Info (Required)</h2>
+        <div class="field">
+          <label>Product Name</label>
+          <input type="text" id="product_name" value="AI Marketing Automation" required>
+        </div>
+        <div class="field">
+          <label>One Liner</label>
+          <input type="text" id="one_liner" value="AI-based marketing optimization that cuts ad costs by 50%" required>
+        </div>
+        <div class="field">
+          <label>Target Audience</label>
+          <input type="text" id="target_audience" value="Smart store sellers spending over 1M KRW/month on ads" required>
+        </div>
+        <div class="field">
+          <label>Main Problem</label>
+          <textarea id="main_problem" required>Spending 2 hours daily optimizing ads while ROAS stays flat</textarea>
+        </div>
+        <div class="field">
+          <label>Key Benefit</label>
+          <textarea id="key_benefit" required>AI optimizes ads 24/7, cutting ad spend by 50% on average</textarea>
+        </div>
+      </div>
+
+      <!-- Pricing & Urgency -->
+      <div class="card">
+        <h2>2. Pricing & Urgency</h2>
+        <div class="row-3">
+          <div class="field">
+            <label>Original Price</label>
+            <input type="text" id="price_original" value="199,000">
+          </div>
+          <div class="field">
+            <label>Discounted Price</label>
+            <input type="text" id="price_discounted" value="99,000">
+          </div>
+          <div class="field">
+            <label>Period</label>
+            <input type="text" id="price_period" value="month">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Urgency</label>
+            <input type="text" id="urgency_value" value="First 100 customers only">
+          </div>
+          <div class="field">
+            <label>Bonus</label>
+            <input type="text" id="urgency_bonus" value="Free 1:1 setup consultation">
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submitBtn">
+        Generate Sales Copy (13 Sections)
+      </button>
+    </form>
+
+    <!-- Progress -->
+    <div class="progress" id="progress">
+      <div class="card">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <p class="progress-text" id="progressText">Analyzing...</p>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="error" id="error"></div>
+
+    <!-- Result -->
+    <div class="result" id="result">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+          <h2 style="border:none;margin:0;padding:0;">Generated Copy</h2>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="copy-all-btn" id="copyJsonBtn">Copy JSON</button>
+            <button class="copy-all-btn" id="copyTextBtn">Copy Text</button>
+            <button class="copy-all-btn" id="resetBtn">Generate New</button>
+          </div>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <div class="tab active" data-tab="copy">Copy (13 Sections)</div>
+          <div class="tab" data-tab="research">Research Analysis</div>
+        </div>
+
+        <!-- Copy tab -->
+        <div id="copyTab"></div>
+
+        <!-- Research tab -->
+        <div id="researchTab" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'https://sgtlim0--landing-page-generator-generate-copy.modal.run';
+
+    function escapeHtml(str) {
+      if (str === undefined || str === null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    const SECTION_NAMES = {
+      section_01_hero: { num: '01', name: 'Hero', desc: 'Urgency Header' },
+      section_02_pain: { num: '02', name: 'Pain', desc: 'Empathy' },
+      section_03_problem: { num: '03', name: 'Problem', desc: 'Root Cause' },
+      section_04_story: { num: '04', name: 'Story', desc: 'Before/After' },
+      section_05_solution: { num: '05', name: 'Solution', desc: 'Product Intro' },
+      section_06_how_it_works: { num: '06', name: 'How It Works', desc: 'Process' },
+      section_07_social_proof: { num: '07', name: 'Social Proof', desc: 'Testimonials' },
+      section_08_authority: { num: '08', name: 'Authority', desc: 'Credibility' },
+      section_09_benefits: { num: '09', name: 'Benefits', desc: 'Value Stack' },
+      section_10_risk_removal: { num: '10', name: 'Risk Removal', desc: 'Guarantees' },
+      section_11_comparison: { num: '11', name: 'Comparison', desc: 'With vs Without' },
+      section_12_target_filter: { num: '12', name: 'Target Filter', desc: 'Ideal Customer' },
+      section_13_final_cta: { num: '13', name: 'Final CTA', desc: 'Call to Action' },
+    };
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.tab;
+        document.getElementById('copyTab').style.display = target === 'copy' ? 'block' : 'none';
+        document.getElementById('researchTab').style.display = target === 'research' ? 'block' : 'none';
+      });
+    });
+
+    function buildPayload() {
+      return {
+        aws_credentials: {
+          aws_access_key_id: document.getElementById('aws_access_key').value.trim(),
+          aws_secret_access_key: document.getElementById('aws_secret_key').value.trim(),
+          aws_region: document.getElementById('aws_region').value,
+        },
+        brief: {
+          product_name: document.getElementById('product_name').value,
+          one_liner: document.getElementById('one_liner').value,
+          target_audience: document.getElementById('target_audience').value,
+          main_problem: document.getElementById('main_problem').value,
+          key_benefit: document.getElementById('key_benefit').value,
+          price: {
+            original: document.getElementById('price_original').value,
+            discounted: document.getElementById('price_discounted').value,
+            period: document.getElementById('price_period').value,
+          },
+          urgency: {
+            type: 'quantity',
+            value: document.getElementById('urgency_value').value,
+            bonus: document.getElementById('urgency_bonus').value,
+          },
+        },
+      };
+    }
+
+    function renderCopyField(label, value) {
+      if (value === undefined || value === null) return '';
+      if (Array.isArray(value)) {
+        return `<div class="copy-field"><div class="label">${escapeHtml(label)}</div><ul class="value-list">${value.map(v => `<li>${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</li>`).join('')}</ul></div>`;
+      }
+      return `<div class="copy-field"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div></div>`;
+    }
+
+    function renderSection(key, data) {
+      const info = SECTION_NAMES[key] || { num: '??', name: key, desc: '' };
+      let bodyHtml = '';
+
+      if (key === 'section_01_hero') {
+        bodyHtml += '<div class="copy-field"><div class="label">Headlines (Options)</div>';
+        (data.headline_options || []).forEach((h, i) => {
+          bodyHtml += `<div class="headline-option">${i + 1}. ${escapeHtml(h)}</div>`;
+        });
+        bodyHtml += '</div>';
+        bodyHtml += renderCopyField('Subheadline', data.subheadline);
+        bodyHtml += renderCopyField('Urgency Badge', data.urgency_badge);
+        bodyHtml += renderCopyField('CTA Text', data.cta_text);
+      } else if (key === 'section_02_pain') {
+        bodyHtml += renderCopyField('Intro', data.intro);
+        bodyHtml += renderCopyField('Pain Points', data.pain_points);
+        bodyHtml += renderCopyField('Emotional Hook', data.emotional_hook);
+      } else if (key === 'section_03_problem') {
+        bodyHtml += renderCopyField('Hook', data.hook);
+        bodyHtml += renderCopyField('Reasons', data.reasons);
+        bodyHtml += renderCopyField('Reframe', data.reframe);
+      } else if (key === 'section_04_story') {
+        bodyHtml += renderCopyField('Before', data.before);
+        bodyHtml += renderCopyField('Turning Point', data.turning_point);
+        bodyHtml += renderCopyField('After', data.after);
+        bodyHtml += renderCopyField('Proof', data.proof);
+      } else if (key === 'section_05_solution') {
+        bodyHtml += renderCopyField('Intro', data.intro);
+        bodyHtml += renderCopyField('Product Name', data.product_name);
+        bodyHtml += renderCopyField('One Liner', data.one_liner);
+        bodyHtml += renderCopyField('Target Fit', data.target_fit);
+      } else if (key === 'section_06_how_it_works') {
+        bodyHtml += renderCopyField('Headline', data.headline);
+        bodyHtml += '<div class="copy-field"><div class="label">Steps</div>';
+        (data.steps || []).forEach(s => {
+          bodyHtml += `<div class="step-card"><div class="step-num">${escapeHtml(s.number)}</div><div><strong>${escapeHtml(s.title)}</strong><br><span style="font-size:0.85rem;color:#64748b">${escapeHtml(s.description)}</span>${s.result ? `<br><span style="font-size:0.8rem;color:#059669">Result: ${escapeHtml(s.result)}</span>` : ''}</div></div>`;
+        });
+        bodyHtml += '</div>';
+      } else if (key === 'section_07_social_proof') {
+        bodyHtml += renderCopyField('Headline', data.headline);
+        if (data.stats) {
+          bodyHtml += '<div class="copy-field"><div class="label">Stats</div>';
+          (data.stats || []).forEach(s => {
+            bodyHtml += `<span style="display:inline-block;background:#f1f5f9;padding:0.4rem 0.75rem;border-radius:6px;margin:0.2rem;font-weight:700;color:#059669;">${escapeHtml(s.number)}</span><span style="font-size:0.8rem;color:#94a3b8;margin-right:1rem;">${escapeHtml(s.label)}</span>`;
+          });
+          bodyHtml += '</div>';
+        }
+        bodyHtml += '<div class="copy-field"><div class="label">Testimonials</div>';
+        (data.testimonials || []).forEach(t => {
+          bodyHtml += `<div class="testimonial-card"><div class="quote">"${escapeHtml(t.quote)}"</div><div class="meta">${escapeHtml(t.name)} - ${escapeHtml(t.role)} ${t.result ? `| ${escapeHtml(t.result)}` : ''} ${'&#11088;'.repeat(t.rating || 5)}</div></div>`;
+        });
+        bodyHtml += '</div>';
+      } else if (key === 'section_08_authority') {
+        bodyHtml += renderCopyField('Intro', data.intro);
+        bodyHtml += renderCopyField('Bio', data.bio);
+        bodyHtml += renderCopyField('Credentials', data.credentials);
+        bodyHtml += renderCopyField('Message', data.message);
+      } else if (key === 'section_09_benefits') {
+        bodyHtml += renderCopyField('Headline', data.headline);
+        bodyHtml += renderCopyField('Main Benefits', data.main_benefits);
+        if (data.bonus_items) {
+          bodyHtml += '<div class="copy-field"><div class="label">Bonus Items</div>';
+          (data.bonus_items || []).forEach(b => {
+            bodyHtml += `<div style="padding:0.3rem 0;font-size:0.9rem;"><strong>${escapeHtml(b.name)}</strong> <span style="color:#059669;">(${escapeHtml(b.value)})</span></div>`;
+          });
+          bodyHtml += '</div>';
+        }
+        bodyHtml += renderCopyField('Total Value', data.total_value);
+      } else if (key === 'section_10_risk_removal') {
+        bodyHtml += renderCopyField('Guarantee', data.guarantee);
+        if (data.faq) {
+          bodyHtml += '<div class="copy-field"><div class="label">FAQ</div>';
+          (data.faq || []).forEach(f => {
+            bodyHtml += `<div style="margin-bottom:0.5rem;"><strong style="color:#334155;">Q: ${escapeHtml(f.question)}</strong><br><span style="font-size:0.85rem;color:#64748b;">A: ${escapeHtml(f.answer)}</span></div>`;
+          });
+          bodyHtml += '</div>';
+        }
+        bodyHtml += renderCopyField('Support', data.support);
+      } else if (key === 'section_11_comparison') {
+        bodyHtml += `<div class="comparison-grid">
+          <div class="comparison-col without"><h4>Without</h4><ul>${(data.without || []).map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>
+          <div class="comparison-col with"><h4>With</h4><ul>${(data.with || []).map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>
+        </div>`;
+        bodyHtml += renderCopyField('Question', data.question);
+      } else if (key === 'section_12_target_filter') {
+        bodyHtml += `<div class="comparison-grid">
+          <div class="comparison-col with"><h4>Recommended</h4><ul>${(data.recommended || []).map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul></div>
+          <div class="comparison-col without"><h4>Not Recommended</h4><ul>${(data.not_recommended || []).map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul></div>
+        </div>`;
+      } else if (key === 'section_13_final_cta') {
+        bodyHtml += renderCopyField('Headline', data.headline);
+        bodyHtml += renderCopyField('Urgency', data.urgency);
+        bodyHtml += renderCopyField('Price Display', data.price_display);
+        bodyHtml += renderCopyField('CTA Button', data.cta_button);
+        bodyHtml += renderCopyField('Closing', data.closing);
+      } else {
+        bodyHtml += `<pre style="font-size:0.8rem;overflow-x:auto;">${JSON.stringify(data, null, 2)}</pre>`;
+      }
+
+      return `<div class="section-output">
+        <div class="section-header" onclick="this.nextElementSibling.classList.toggle('open')">
+          <h3>${info.num}. ${info.name} <span style="font-weight:400;color:#94a3b8;">- ${info.desc}</span></h3>
+          <span class="badge">Section ${info.num}</span>
+        </div>
+        <div class="section-body">${bodyHtml}</div>
+      </div>`;
+    }
+
+    function renderResearch(research) {
+      let html = '';
+
+      if (research.pain_points) {
+        html += '<div class="section-output"><div class="section-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3>Pain Points Analysis</h3></div><div class="section-body open">';
+        research.pain_points.forEach(p => {
+          html += `<div style="margin-bottom:0.75rem;padding:0.5rem;background:#fef2f2;border-radius:6px;border-left:3px solid #ef4444;"><strong>${escapeHtml(p.category)}</strong>: ${escapeHtml(p.pain)}<br><span style="font-size:0.85rem;color:#64748b;">${escapeHtml(p.emotional_hook)}</span></div>`;
+        });
+        html += '</div></div>';
+      }
+
+      if (research.failure_reasons) {
+        html += '<div class="section-output"><div class="section-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3>Failure Reasons</h3></div><div class="section-body open">';
+        research.failure_reasons.forEach(f => {
+          html += `<div style="margin-bottom:0.75rem;"><strong>${escapeHtml(f.reason)}</strong><br><span style="font-size:0.85rem;color:#64748b;">${escapeHtml(f.explanation)}</span><br><span style="font-size:0.85rem;color:#059669;">Reframe: ${escapeHtml(f.reframe)}</span></div>`;
+        });
+        html += '</div></div>';
+      }
+
+      if (research.after_image) {
+        const a = research.after_image;
+        html += '<div class="section-output"><div class="section-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3>After Image (Transformation)</h3></div><div class="section-body open">';
+        html += renderCopyField('Concrete Result', a.concrete_result);
+        html += renderCopyField('Emotional Freedom', a.emotional_freedom);
+        html += renderCopyField('Time Saved', a.time_saved);
+        html += renderCopyField('Lifestyle Change', a.lifestyle_change);
+        html += '</div></div>';
+      }
+
+      if (research.objections) {
+        html += '<div class="section-output"><div class="section-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3>Objections & Counters</h3></div><div class="section-body">';
+        research.objections.forEach(o => {
+          html += `<div style="margin-bottom:0.5rem;"><strong style="color:#dc2626;">Q:</strong> ${escapeHtml(o.objection)}<br><strong style="color:#059669;">A:</strong> ${escapeHtml(o.counter)}</div>`;
+        });
+        html += '</div></div>';
+      }
+
+      if (research.differentiators) {
+        html += '<div class="section-output"><div class="section-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3>Differentiators</h3></div><div class="section-body">';
+        research.differentiators.forEach(d => {
+          html += `<div style="margin-bottom:0.5rem;"><strong>${escapeHtml(d.point)}</strong><br><span style="font-size:0.85rem;color:#64748b;">${escapeHtml(d.explanation)}</span></div>`;
+        });
+        html += '</div></div>';
+      }
+
+      return html;
+    }
+
+    let lastResult = null;
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const btn = document.getElementById('submitBtn');
+      const progress = document.getElementById('progress');
+      const error = document.getElementById('error');
+      const result = document.getElementById('result');
+
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      progress.classList.add('show');
+      error.classList.remove('show');
+      result.classList.remove('show');
+
+      let pct = 0;
+      const steps = ['Analyzing product info...', 'Running research analysis...', 'Generating 13-section copy...', 'Finalizing...'];
+      let stepIdx = 0;
+      const progressInterval = setInterval(() => {
+        pct = Math.min(pct + (Math.random() * 5 + 2), 95);
+        document.getElementById('progressFill').style.width = pct + '%';
+        if (pct > 25 && stepIdx < 1) stepIdx = 1;
+        if (pct > 50 && stepIdx < 2) stepIdx = 2;
+        if (pct > 85 && stepIdx < 3) stepIdx = 3;
+        document.getElementById('progressText').textContent = `${steps[stepIdx]} (${Math.round(pct)}%)`;
+      }, 2000);
+
+      try {
+        const payload = buildPayload();
+        const resp = await fetch(API_BASE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        clearInterval(progressInterval);
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`API Error ${resp.status}: ${text}`);
+        }
+
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+
+        lastResult = data;
+
+        document.getElementById('progressFill').style.width = '100%';
+        document.getElementById('progressText').textContent = 'Complete!';
+
+        setTimeout(() => {
+          progress.classList.remove('show');
+          result.classList.add('show');
+
+          // Render copy sections
+          const copyTab = document.getElementById('copyTab');
+          let copyHtml = '';
+          const copyData = data.copy || {};
+          Object.keys(SECTION_NAMES).forEach(key => {
+            if (copyData[key]) {
+              copyHtml += renderSection(key, copyData[key]);
+            }
+          });
+          copyTab.innerHTML = copyHtml || '<p style="color:#94a3b8;">No copy data returned.</p>';
+
+          // Auto-open first section
+          const firstBody = copyTab.querySelector('.section-body');
+          if (firstBody) firstBody.classList.add('open');
+
+          // Render research
+          const researchTab = document.getElementById('researchTab');
+          researchTab.innerHTML = data.research ? renderResearch(data.research) : '<p style="color:#94a3b8;">No research data.</p>';
+        }, 500);
+      } catch (err) {
+        clearInterval(progressInterval);
+        progress.classList.remove('show');
+        error.classList.add('show');
+        error.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Sales Copy (13 Sections)';
+      }
+    });
+
+    // Copy JSON
+    document.getElementById('copyJsonBtn')?.addEventListener('click', () => {
+      if (lastResult) {
+        navigator.clipboard.writeText(JSON.stringify(lastResult, null, 2));
+        document.getElementById('copyJsonBtn').textContent = 'Copied!';
+        setTimeout(() => { document.getElementById('copyJsonBtn').textContent = 'Copy JSON'; }, 1500);
+      }
+    });
+
+    // Copy Text
+    document.getElementById('copyTextBtn')?.addEventListener('click', () => {
+      if (!lastResult?.copy) return;
+      let text = '';
+      const copy = lastResult.copy;
+      Object.keys(SECTION_NAMES).forEach(key => {
+        const info = SECTION_NAMES[key];
+        if (!copy[key]) return;
+        text += `\n${'='.repeat(40)}\n${info.num}. ${info.name} (${info.desc})\n${'='.repeat(40)}\n`;
+        const section = copy[key];
+        Object.entries(section).forEach(([k, v]) => {
+          if (Array.isArray(v)) {
+            text += `\n[${k}]\n`;
+            v.forEach((item, i) => {
+              text += typeof item === 'object' ? `  ${i + 1}. ${JSON.stringify(item)}\n` : `  ${i + 1}. ${item}\n`;
+            });
+          } else if (typeof v === 'object' && v !== null) {
+            text += `\n[${k}]\n${JSON.stringify(v, null, 2)}\n`;
+          } else {
+            text += `\n[${k}]\n${v}\n`;
+          }
+        });
+      });
+      navigator.clipboard.writeText(text);
+      document.getElementById('copyTextBtn').textContent = 'Copied!';
+      setTimeout(() => { document.getElementById('copyTextBtn').textContent = 'Copy Text'; }, 1500);
+    });
+
+    // Reset
+    document.getElementById('resetBtn')?.addEventListener('click', () => {
+      document.getElementById('result').classList.remove('show');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>

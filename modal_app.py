@@ -333,6 +333,211 @@ def generate_landing_page(brief: Optional[dict] = None, credentials: Optional[di
 
 
 # ──────────────────────────────────────────────
+# 카피라이터 헬퍼 함수
+# ──────────────────────────────────────────────
+def _call_opus(client, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
+    """Opus 4.6으로 텍스트를 생성합니다."""
+    model_id = os.environ.get("BEDROCK_TEXT_MODEL", "us.anthropic.claude-opus-4-6-v1")
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": max_tokens,
+        "system": system_prompt,
+        "messages": [{"role": "user", "content": user_prompt}],
+    }
+    resp = client.invoke_model(
+        modelId=model_id,
+        contentType="application/json",
+        accept="application/json",
+        body=json.dumps(body),
+    )
+    result = json.loads(resp["body"].read())
+    return result.get("content", [{}])[0].get("text", "").strip()
+
+
+def _parse_json_response(text: str) -> dict:
+    """LLM 응답에서 JSON을 안전하게 추출합니다."""
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            try:
+                return json.loads(text[start:end])
+            except json.JSONDecodeError:
+                pass
+        return {"error": "Failed to parse JSON", "raw_text": text[:500]}
+
+
+_RESEARCH_SYSTEM = """당신은 고전환 상세페이지 전문 리서치 분석가입니다.
+제품 정보를 바탕으로 타겟 고객의 심층 분석과 설득 메시지 프레임을 설계합니다.
+
+분석 원칙:
+1. 구체성: 추상적 표현 대신 숫자와 상황으로
+2. 감정 연결: 타겟이 "이거 내 얘기다" 느끼도록
+3. 진정성: 과장 없이 실제 해결 가능한 것만
+4. 논리 흐름: 고통 → 원인 → 해결 → 결과의 자연스러운 연결
+
+반드시 JSON 형식으로만 응답하세요."""
+
+
+def _build_research_prompt(brief: dict) -> str:
+    return f"""다음 제품 정보를 분석하여 리서치 결과를 JSON으로 생성하세요.
+
+## 제품 정보
+- 제품명: {brief.get('product_name', '')}
+- 한 줄 정의: {brief.get('one_liner', '')}
+- 타겟 고객: {brief.get('target_audience', '')}
+- 핵심 문제: {brief.get('main_problem', '')}
+- 핵심 혜택: {brief.get('key_benefit', '')}
+- 가격: 정가 {brief.get('price', {}).get('original', '')}, 할인가 {brief.get('price', {}).get('discounted', '')}
+- 긴급성: {brief.get('urgency', {}).get('value', '')}
+
+## 출력 JSON 형식:
+{{
+  "pain_points": [
+    {{"category": "emotional|failure|waste|social|future", "pain": "구체적 고통", "emotional_hook": "감정적 연결 문구"}}
+  ],
+  "failure_reasons": [
+    {{"reason": "실패 원인", "explanation": "설명", "reframe": "관점 전환"}}
+  ],
+  "after_image": {{
+    "concrete_result": "구체적 결과",
+    "emotional_freedom": "감정적 해방",
+    "time_saved": "시간 절약",
+    "lifestyle_change": "라이프스타일 변화"
+  }},
+  "objections": [
+    {{"objection": "예상 반론", "counter": "반박"}}
+  ],
+  "differentiators": [
+    {{"point": "차별점", "explanation": "설명"}}
+  ],
+  "message_framework": {{
+    "core_promise": "핵심 약속",
+    "proof_points": ["증거1", "증거2"],
+    "emotional_journey": "고통 → 원인 이해 → 해결책 발견 → 변화 확신"
+  }}
+}}"""
+
+
+_COPY_SYSTEM = """당신은 한국 최고의 다이렉트 리스폰스 카피라이터입니다.
+리서치 결과를 바탕으로 13개 섹션의 고전환 판매 카피를 작성합니다.
+
+카피 원칙:
+1. 한국어 자연스러운 구어체 - 번역투 금지
+2. 감정 → 논리 흐름 - 먼저 공감, 그 다음 설명
+3. 구체적 숫자 - "많은" 대신 "143명", "빠르게" 대신 "3일 만에"
+4. 2인칭 활용 - "당신", "여러분" 적절히
+5. 짧은 문장 - 한 문장 20자 내외
+
+반드시 JSON 형식으로만 응답하세요."""
+
+
+def _build_copy_prompt(brief: dict, research: dict) -> str:
+    price = brief.get("price", {})
+    urgency = brief.get("urgency", {})
+    return f"""다음 제품 정보와 리서치 결과를 바탕으로 13섹션 카피를 JSON으로 생성하세요.
+
+## 제품 정보
+- 제품명: {brief.get('product_name', '')}
+- 한 줄 정의: {brief.get('one_liner', '')}
+- 타겟: {brief.get('target_audience', '')}
+- 핵심 문제: {brief.get('main_problem', '')}
+- 핵심 혜택: {brief.get('key_benefit', '')}
+- 정가: {price.get('original', '')}
+- 할인가: {price.get('discounted', '')}
+- 기간: {price.get('period', '월')}
+- 긴급성: {urgency.get('value', '')}
+- 보너스: {urgency.get('bonus', '')}
+
+## 리서치 결과
+{json.dumps(research, ensure_ascii=False, indent=2)}
+
+## 13섹션 출력 형식:
+{{
+  "section_01_hero": {{
+    "headline_options": ["옵션1", "옵션2", "옵션3"],
+    "subheadline": "타겟 명시 + 방법 힌트",
+    "urgency_badge": "한정 요소",
+    "cta_text": "행동 유도 버튼"
+  }},
+  "section_02_pain": {{
+    "intro": "공감 질문",
+    "pain_points": ["고통1", "고통2", "고통3", "고통4"],
+    "emotional_hook": "감정적 마무리"
+  }},
+  "section_03_problem": {{
+    "hook": "반전 문구",
+    "reasons": ["원인1", "원인2", "원인3"],
+    "reframe": "관점 전환"
+  }},
+  "section_04_story": {{
+    "before": "과거 상태",
+    "turning_point": "전환점",
+    "after": "변화 후",
+    "proof": "증거"
+  }},
+  "section_05_solution": {{
+    "intro": "소개",
+    "product_name": "제품명",
+    "one_liner": "핵심 정의",
+    "target_fit": "적합성"
+  }},
+  "section_06_how_it_works": {{
+    "headline": "헤드라인",
+    "steps": [{{"number": 1, "title": "...", "description": "...", "result": "..."}}]
+  }},
+  "section_07_social_proof": {{
+    "headline": "이미 검증된 결과",
+    "stats": [{{"number": "...", "label": "..."}}],
+    "testimonials": [{{"name": "...", "role": "...", "quote": "...", "result": "...", "rating": 5}}]
+  }},
+  "section_08_authority": {{
+    "intro": "소개",
+    "bio": "이력",
+    "credentials": ["성과1"],
+    "message": "진정성 메시지"
+  }},
+  "section_09_benefits": {{
+    "headline": "헤드라인",
+    "main_benefits": ["혜택1"],
+    "bonus_items": [{{"name": "...", "value": "..."}}],
+    "total_value": "총 가치"
+  }},
+  "section_10_risk_removal": {{
+    "guarantee": "보장 정책",
+    "faq": [{{"question": "...", "answer": "..."}}],
+    "support": "지원"
+  }},
+  "section_11_comparison": {{
+    "without": ["없으면1"],
+    "with": ["있으면1"],
+    "question": "선택 질문"
+  }},
+  "section_12_target_filter": {{
+    "recommended": ["추천1"],
+    "not_recommended": ["비추천1"]
+  }},
+  "section_13_final_cta": {{
+    "headline": "헤드라인",
+    "urgency": "긴급성",
+    "price_display": "가격 표시",
+    "cta_button": "CTA 텍스트",
+    "closing": "마무리"
+  }}
+}}"""
+
+
+# ──────────────────────────────────────────────
 # Web Endpoint: FastAPI
 # ──────────────────────────────────────────────
 @app.function(
@@ -379,38 +584,56 @@ def generate(payload: Optional[dict] = None):
 @app.function(
     image=image,
     secrets=[modal.Secret.from_name("aws-bedrock-secrets")],
-    timeout=900,
+    timeout=600,
 )
 @modal.fastapi_endpoint(method="POST", docs=True)
-def generate_section(payload: Optional[dict] = None):
-    """POST /generate_section - 개별 섹션 이미지 생성"""
-    from fastapi.responses import Response
+def generate_copy(payload: Optional[dict] = None):
+    """POST /generate_copy - AI 카피라이터: 리서치 분석 + 13섹션 카피 생성
+
+    Body:
+    {
+        "aws_credentials": {"aws_access_key_id": "...", "aws_secret_access_key": "...", "aws_region": "..."},
+        "brief": { ...product info... }
+    }
+    """
+    from fastapi.responses import JSONResponse
 
     credentials = None
     brief = None
-    section_key = "01_hero"
 
     if payload and "aws_credentials" in payload:
         credentials = payload.get("aws_credentials")
         brief = payload.get("brief")
-        section_key = payload.get("section_key", "01_hero")
     else:
         brief = payload
 
     if brief is None:
         brief = SAMPLE_BRIEF
 
-    prompts = _build_prompts(brief)
-    if section_key not in prompts:
-        return {"error": f"Unknown section: {section_key}", "available": list(prompts.keys())}
+    try:
+        client = _get_bedrock_client(credentials)
 
-    client = _get_bedrock_client(credentials)
-    data = prompts[section_key]
-    png_bytes = _generate_one_image(client, data["prompt"], data["width"], data["height"])
+        # Step 1: 리서치 분석
+        print("[Copy 1/2] Running research analysis...")
+        research_raw = _call_opus(client, _RESEARCH_SYSTEM, _build_research_prompt(brief))
+        research = _parse_json_response(research_raw)
+        print(f"  Research done: {len(research)} keys")
 
-    if png_bytes:
-        return Response(content=png_bytes, media_type="image/png")
-    return {"error": f"Failed to generate {section_key}"}
+        # Step 2: 13섹션 카피 생성
+        print("[Copy 2/2] Generating 13-section copy...")
+        copy_raw = _call_opus(client, _COPY_SYSTEM, _build_copy_prompt(brief, research), max_tokens=8192)
+        copy_result = _parse_json_response(copy_raw)
+        print(f"  Copy done: {len(copy_result)} sections")
+
+        return JSONResponse(content={
+            "research": research,
+            "copy": copy_result,
+            "brief": brief,
+        })
+    except Exception as e:
+        import traceback
+        print(f"[generate_copy] Error: {traceback.format_exc()}")
+        return JSONResponse(content={"error": "Copy generation failed. Please check your credentials and try again."}, status_code=500)
 
 
 @app.function(image=image, secrets=[modal.Secret.from_name("aws-bedrock-secrets")])
