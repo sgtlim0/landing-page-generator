@@ -610,6 +610,16 @@ def generate_copy(payload: Optional[dict] = None):
     if brief is None:
         brief = SAMPLE_BRIEF
 
+    # 필수 필드 검증
+    MAX_FIELD_LEN = 500
+    required_fields = ['product_name', 'one_liner', 'target_audience', 'main_problem', 'key_benefit']
+    for field in required_fields:
+        value = brief.get(field)
+        if not value or not isinstance(value, str) or not value.strip():
+            return JSONResponse(content={"error": f"Missing required field: {field}"}, status_code=400)
+        if len(value) > MAX_FIELD_LEN:
+            return JSONResponse(content={"error": f"Field '{field}' exceeds {MAX_FIELD_LEN} characters"}, status_code=400)
+
     try:
         client = _get_bedrock_client(credentials)
 
